@@ -1,0 +1,19 @@
+{
+  "name": "topstepx",
+  "version": "1.0.0",
+  "main": "server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "@microsoft/signalr": "^8.0.7",
+    "csvjson": "^5.1.0",
+    "ws": "^8.18.3"
+  },
+  "type": "module"
+}
