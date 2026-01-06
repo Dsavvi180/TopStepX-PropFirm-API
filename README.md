@@ -1,11 +1,10 @@
 # TopStepX Real-Time Market Data Pipeline
 
-This repository provides a complete real-time trading data pipeline for TopStep's NASDAQ futures market, integrating Node.js, Python, and SignalR technologies. It enables authentication, session management, real-time market data streaming, and machine learning-based prediction.
+This repository provides a complete real-time trading data pipeline for TopStep's NASDAQ futures market, integrating Node.js, Python, and SignalR technologies. It enables authentication, session management, real-time market data streaming, and machine learning-based training & prediction.
 ## Features
 - **Session Management**: Robust JWT authentication, token validation, and refresh logic for TopStep API.
 - **SignalR Client**: Real-time WebSocket connection to TopStep's market data hub using @microsoft/signalr.
 - **Market Data Streaming**: Subscribes to and processes live quote, trade, and market depth data for NASDAQ futures (`/NQ`).
-- **Python WebSocket Relay**: Python server (`websocketRelay.py`) for relaying and processing real-time data, including ML-based predictions.
 - **Modular Codebase**: Clean ES module structure for Node.js, with clear separation of concerns (sessions, SignalR, server, test).
 
 ## Project Structure
@@ -14,7 +13,6 @@ This repository provides a complete real-time trading data pipeline for TopStep'
 - `signalRClient.js` — SignalR connection wrapper with event emitters for quote, trade, and depth data.
 - `sessions/` — Session management system (authentication, token management, validation).
 - `test.js` — Standalone test for SignalR connection and token management.
-- `websocketRelay.py` — Python WebSocket server for real-time ML predictions on market data.
 - `requirements.txt` — Python dependencies for ML and WebSocket relay.
 - `myenv/` — Python virtual environment (do not edit directly).
 
