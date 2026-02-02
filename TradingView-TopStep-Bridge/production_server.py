@@ -1,12 +1,11 @@
 import sys
 import os
 import json
-import threading # Imported for background timer
-import time      # Imported for sleep
 from datetime import datetime
 from flask import Flask, request, jsonify
 from pyngrok import ngrok
 from dotenv import load_dotenv
+import requests
 # tmux new -s myserver (run the following commands inside a tmux session - allows server to run in terminal session once detached)
 # TO START SERVER: run  sudo python -m gunicorn --preload --workers 2 --threads 4 --worker-class gthread -b 0.0.0.0:8000 production_server:app
 # TO DETACH TMUX: Ctrl + B, then D
@@ -21,29 +20,15 @@ load_dotenv()
 
 app = Flask(__name__)
 PORT = 8000 
-
-# --- BACKGROUND TOKEN REFRESHER ---
-def background_token_renewer():
-    """
-    Runs in a background thread.
-    Sleeps for 23 hours, then forces a token refresh to keep the session alive.
-    """
-    while True:
-        # Sleep for 23 hours (23 hours * 60 minutes * 60 seconds)
-        interval = 10 * 60 * 60
-        time.sleep(interval)
-        
-        timestamp = datetime.now().strftime("[%Y-%m-%d %H:%M:%S]")
-        print(f"\n{timestamp} ⏳ Scheduled Maintenance: Refreshing Topstep Token...")
-        
-        try:
-            success = topstep_client.refresh_auth()
-            if success:
-                print(f"{timestamp} ✅ Token Refresh Successful.")
-            else:
-                print(f"{timestamp} ❌ Token Refresh Failed (AuthManager returned False).")
-        except Exception as e:
-            print(f"{timestamp} ❌ CRITICAL: Token Refresh Error: {e}")
+DISCORD_WEBHOOK = "https://discord.com/api/webhooks/1468027584590647390/u-FZPVp_lX7lDGKttgx7bK0QGBNXTwV8RD7s7x436Rvn8AJmSY7lxdI2IKPSB6OGwQza"
+def send_discord_alert(message):
+    """Sends a trade notification to Discord."""
+    try:
+        payload = {"content": message}
+        # Timeout is short (3s) so it doesn't slow down the trading server response
+        requests.post(DISCORD_WEBHOOK, json=payload, timeout=3)
+    except Exception as e:
+        print(f"⚠️ Failed to send Discord alert: {e}")
 
 # --- NGROK SETUP ---
 # We check WERKZEUG_RUN_MAIN to ensure ngrok doesn't start twice during Flask reloads
@@ -60,6 +45,7 @@ if os.environ.get("WERKZEUG_RUN_MAIN") != "true":
             public_url = ngrok.connect(PORT).public_url
             print(f" * Ngrok Tunnel URL: {public_url}")
             print(f" * Webhook Endpoint: {public_url}/webhook")
+            send_discord_alert(f"🟢 **Server Online**\nTunnel: `{public_url}`")
         except Exception as e:
             print(f" ! Ngrok startup error: {e}")
     else:
@@ -106,10 +92,26 @@ def webhook_listener():
                 tp_price=tp,
                 use_brackets=use_brackets
             )
+
+            discord_msg = (
+                f"🚀 **Order Filled: {action}**\n"
+                f"💲 Entry: `{entry}`\n"
+                f" SL: `{sl}`\n"
+                f" TP: `{tp}`\n"
+                f"🛡️ Brackets: `{use_brackets}`\n"
+                f"📜 Details: `{str(result)}`"
+            )
+            send_discord_alert(discord_msg)
             return jsonify({"status": "filled", "details": result}), 200
 
         except Exception as e:
             print(f" Order Failed: {e}")
+            # --- FAILURE ALERT ---
+            discord_msg = (
+                f"❌ **Order FAILED: {action}**\n"
+                f"⚠️ Error: `{str(e)}`"
+            )
+            send_discord_alert(discord_msg)
             with open("error_log.txt", "a") as f:
                 f.write(f"[{datetime.now()}] FAILED: {action} - {e}\n")
             return jsonify({"status": "failed", "error": str(e)}), 500
@@ -137,12 +139,4 @@ def test_refresh():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 if __name__ == '__main__':
-    # Start the background thread
-    # daemon=True ensures the thread dies when the main program exits
-    if os.environ.get("WERKZEUG_RUN_MAIN") == "true":
-        # Only start the thread in the main reloader process to avoid duplicates
-        renewer_thread = threading.Thread(target=background_token_renewer, daemon=True)
-        renewer_thread.start()
-        print(" * Background Token Refresher Started (Every 23h)")
-
     app.run(port=PORT)
