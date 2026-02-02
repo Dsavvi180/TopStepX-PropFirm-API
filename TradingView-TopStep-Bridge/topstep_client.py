@@ -9,7 +9,7 @@ load_dotenv(ENV_FILE)
 
 # Static Credentials
 TOPSTEP_USER = "quantsavvi"   
-ACCOUNT_ID = 16123563  
+ACCOUNT_ID = 18173783  
 CONTRACT_ID = "CON.F.US.MNQ.H26"
 DEFAULT_SIZE = 2
 TICK_SIZE = 0.25 # MNQ Tick Size
@@ -25,6 +25,7 @@ class AuthManager:
         self.token = os.getenv("RENEWED_AUTH")
         self.api_key = os.getenv("INITIAL_AUTH")
         
+        # Initial check on startup
         if not self.validate_current_token():
             print("⚠️ Stored token invalid or missing. Attempting fresh login...")
             self.login()
@@ -32,6 +33,7 @@ class AuthManager:
     def save_token(self, new_token):
         with self.lock:
             self.token = new_token
+            # Update the .env file so the token persists across restarts
             set_key(ENV_FILE, "RENEWED_AUTH", new_token)
 
     def validate_current_token(self):
@@ -47,6 +49,7 @@ class AuthManager:
         return False
 
     def login(self):
+        """Forces a fresh login and updates the token."""
         payload = {"userName": TOPSTEP_USER, "apiKey": self.api_key}
         headers = {'Content-Type': 'application/json', 'accept': 'text/plain'}
         try:
@@ -54,11 +57,12 @@ class AuthManager:
             if r.status_code == 200 and r.json().get('success'):
                 new_token = r.json().get('token')
                 self.save_token(new_token)
+                print(f"[Auth] Token successfully renewed.")
                 return True
             else:
-                print(f"❌ [Auth] Login Failed: {r.text}")
+                print(f"[Auth] Login Failed: {r.text}")
         except Exception as e:
-            print(f"❌ [Auth] Connection Error: {e}")
+            print(f"[Auth] Connection Error: {e}")
         return False
 
     def get_headers(self):
@@ -67,6 +71,12 @@ class AuthManager:
         return {"Authorization": f"Bearer {self.token}", "Content-Type": "application/json"}
 
 auth = AuthManager()
+
+# --- NEW FUNCTION FOR SERVER TO CALL ---
+def refresh_auth():
+    """Wrapper to force a token refresh from external modules."""
+    print("🔄 Manual/Scheduled Token Refresh Triggered...")
+    return auth.login()
 
 def execute_order(action, entry_price=0, sl_price=0, tp_price=0, use_brackets=False):
     """
@@ -107,7 +117,6 @@ def execute_order(action, entry_price=0, sl_price=0, tp_price=0, use_brackets=Fa
             final_tp = -tp_ticks  # Sell: Target below (negative)
 
         # Append Brackets to Payload
-        # NOTE: Using types 4 and 1 per your original snippet
         payload["stopLossBracket"] = { "type": 4, "ticks": final_sl }
         payload["takeProfitBracket"] = { "type": 1, "ticks": final_tp }
         
