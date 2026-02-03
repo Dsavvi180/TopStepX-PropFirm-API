@@ -20,7 +20,7 @@ load_dotenv()
 
 app = Flask(__name__)
 PORT = 8000 
-DISCORD_WEBHOOK = "https://discord.com/api/webhooks/1468027584590647390/u-FZPVp_lX7lDGKttgx7bK0QGBNXTwV8RD7s7x436Rvn8AJmSY7lxdI2IKPSB6OGwQza"
+DISCORD_WEBHOOK = ""
 def send_discord_alert(message):
     """Sends a trade notification to Discord."""
     try:
