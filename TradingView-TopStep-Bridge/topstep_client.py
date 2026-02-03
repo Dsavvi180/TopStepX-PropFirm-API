@@ -8,8 +8,8 @@ ENV_FILE = "auth_tokens.env"
 load_dotenv(ENV_FILE)
 
 # Static Credentials
-TOPSTEP_USER = "quantsavvi"   
-ACCOUNT_ID = 18173783  
+TOPSTEP_USER = ""   
+ACCOUNT_ID =  ""
 CONTRACT_ID = "CON.F.US.MNQ.H26"
 DEFAULT_SIZE = 2
 TICK_SIZE = 0.25 # MNQ Tick Size
