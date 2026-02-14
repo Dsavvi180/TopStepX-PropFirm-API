@@ -1,10 +1,13 @@
 import time
 import requests
 from datetime import datetime
-
+from dotenv import load_dotenv
+import os
+ENV_FILE = "auth_tokens.env"
+load_dotenv(ENV_FILE)
 # --- CONFIGURATION ---
 REFRESH_URL = "http://damens-server.local:8000/test-refresh"
-DISCORD_WEBHOOK = "https://discord.com/api/webhooks/1468027584590647390/u-FZPVp_lX7lDGKttgx7bK0QGBNXTwV8RD7s7x436Rvn8AJmSY7lxdI2IKPSB6OGwQza"
+DISCORD_WEBHOOK = os.getenv("DISCORD_WEBHOOK")
 
 # 12 Hours in seconds (12 * 60 * 60)
 INTERVAL_SECONDS = 43200 
