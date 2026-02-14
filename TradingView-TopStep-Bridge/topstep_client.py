@@ -1,6 +1,7 @@
 import os
 import requests
 import threading
+import time
 from dotenv import load_dotenv, set_key
 
 # --- CONFIGURATION ---
@@ -9,7 +10,6 @@ load_dotenv(ENV_FILE)
 
 # Static Credentials
 TOPSTEP_USER = "quantsavvi"   
-ACCOUNT_ID = os.getenv("ACCOUNT_ID") 
 CONTRACT_ID = "CON.F.US.MNQ.H26"
 DEFAULT_SIZE = 2
 TICK_SIZE = 0.25 # MNQ Tick Size
@@ -78,10 +78,9 @@ def refresh_auth():
     print("🔄 Manual/Scheduled Token Refresh Triggered...")
     return auth.login()
 
-def execute_order(action, entry_price=0, sl_price=0, tp_price=0, use_brackets=False):
+def execute_order(accountID,action, entry_price=0, sl_price=0, tp_price=0, use_brackets=False, quantity=DEFAULT_SIZE):
     """
-    Sends order to Topstep. 
-    If use_brackets=True, calculates ticks and attaches SL/TP.
+    Sends order to Topstep with Retry Logic.
     """
     action = action.lower()
 
@@ -89,11 +88,11 @@ def execute_order(action, entry_price=0, sl_price=0, tp_price=0, use_brackets=Fa
     side_code = 0 if action == 'buy' else 1
     
     payload = {
-        "accountId": ACCOUNT_ID,
+        "accountId": accountID,
         "contractId": CONTRACT_ID,
         "type": 2, # Market Order
         "side": side_code,
-        "size": DEFAULT_SIZE
+        "size": quantity
     }
 
     # 2. Conditional Bracket Logic
@@ -124,12 +123,35 @@ def execute_order(action, entry_price=0, sl_price=0, tp_price=0, use_brackets=Fa
     else:
         mode_msg = "NAKED (No SL/TP)"
 
-    print(f"⚙️  Sending Order: {action.upper()} {DEFAULT_SIZE}x | {mode_msg}")
+    print(f"⚙️  Sending Order: {action.upper()} {quantity}x | {mode_msg}")
     
-    # 3. Send Request
-    response = requests.post(URL_ORDER, json=payload, headers=auth.get_headers(), timeout=5)
+    # 3. Send Request with Retry Logic (Max 3 attempts)
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            # We call auth.get_headers() every time to ensure we use the latest token
+            response = requests.post(URL_ORDER, json=payload, headers=auth.get_headers(), timeout=5)
+            
+            # SUCCESS: Guard against duplicate execution by returning immediately
+            if response.status_code == 200:
+                return response.json()
+            
+            # RECOVERABLE ERROR (401 Unauthorized)
+            elif response.status_code == 401:
+                print(f"⚠️ [Attempt {attempt+1}/{max_retries}] 401 Unauthorized. Refreshing Token...")
+                if auth.login():
+                    time.sleep(1) # Short pause before retry
+                    continue # Retry the loop
+                else:
+                    raise Exception("Token refresh failed. Cannot retry order.")
+            
+            # NON-RECOVERABLE ERROR
+            else:
+                raise Exception(f"API Error {response.status_code}: {response.text}")
+
+        except requests.exceptions.RequestException as e:
+            print(f"⚠️ [Attempt {attempt+1}/{max_retries}] Network Error: {e}")
+            if attempt == max_retries - 1:
+                raise # Re-raise if it's the last attempt
     
-    if response.status_code == 200:
-        return response.json()
-    else:
-        raise Exception(f"API Error {response.status_code}: {response.text}")
+    raise Exception("Max retries exceeded without success.")

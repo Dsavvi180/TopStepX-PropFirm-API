@@ -16,14 +16,41 @@ import requests
 # Import the local client module
 import topstep_client
 
+# --- CONFIGURATION ---
 # Load environment variables from .env file
 ENV_FILE = "auth_tokens.env"
 load_dotenv(ENV_FILE)
+
 app = Flask(__name__)
 PORT = 8000 
 DISCORD_WEBHOOK = os.getenv("DISCORD_WEBHOOK")
+
+# Override JSON order size:
+ACCOUNT_1 = os.getenv("ACCOUNT_ID_1")
+ACCOUNT_2 = os.getenv("ACCOUNT_ID_2")
+ACCOUNT_3 = os.getenv("ACCOUNT_ID_3")
+ACCOUNT_4 = os.getenv("ACCOUNT_ID_4")
+ACCOUNT_5 = os.getenv("ACCOUNT_ID_5")
+
+# Set contract sizes for each account individually (if override is enabled)
+OVERRIDE_SIZE_TRUE = True
+OVERRIDE_SIZE = {ACCOUNT_1: 1, ACCOUNT_3: 1, ACCOUNT_2: 3, ACCOUNT_4: 3, ACCOUNT_5: 3}
+
+# Load Account IDs from environment variables
+# This creates a list of IDs and filters out any empty ones (None or "")
+ACCOUNTS = [
+    ACCOUNT_1,
+    ACCOUNT_2,
+    ACCOUNT_3,
+    ACCOUNT_4,
+    ACCOUNT_5
+]
+ACCOUNTS = [acc for acc in ACCOUNTS if acc] # Filter out empty slots
+
 def send_discord_alert(message):
     """Sends a trade notification to Discord."""
+    if not DISCORD_WEBHOOK:
+        return
     try:
         payload = {"content": message}
         # Timeout is short (3s) so it doesn't slow down the trading server response
@@ -71,51 +98,78 @@ def webhook_listener():
     tp = float(data.get("tp", 0))
     alert_time = data.get("time", "N/A")
     
+    # Extract Order Size (Check for 'size' or 'quantity', defaults to 2)
+    order_size = int(data.get("size", data.get("quantity", 2)))
+    
     # Extract the Bracket Switch (Defaults to False)
     use_brackets = data.get("use_brackets", False) 
 
     # 2. Log to File
-    now = datetime.now()
-    
     with open("webhook_logs.txt", "a") as f:
-        log_entry = f"Alert: {alert_time} | {action} | Entry: {entry} | Brackets: {use_brackets}\n"
+        log_entry = f"Alert: {alert_time} | {action} | Size: {order_size} | Entry: {entry} | Brackets: {use_brackets}\n"
         f.write(log_entry)
 
-    # 3. Execute Trade
+    # 3. Execute Trade Loop
+    results = [] # To store status of each account
+    
     if action in ["BUY", "SELL"]:
-        print(f" Triggering Topstep Order: {action} (Brackets: {use_brackets})")
+        print(f" Triggering Topstep Orders: {action} {order_size}x (Brackets: {use_brackets})")
         
-        try:
-            result = topstep_client.execute_order(
-                action=action, 
-                entry_price=entry,
-                sl_price=sl,
-                tp_price=tp,
-                use_brackets=use_brackets
-            )
+        # Loop through ALL accounts in the list
+        for accountID in ACCOUNTS:
+            print(f" >> Processing Account {accountID}...")
+            current_size = order_size
+            if OVERRIDE_SIZE_TRUE and accountID in OVERRIDE_SIZE:
+                current_size = OVERRIDE_SIZE.get(accountID, current_size) # Use override size if specified for this account
 
-            discord_msg = (
-                f"🚀 **Order Filled: {action}**\n"
-                f"💲 Entry: `{entry}`\n"
-                f" SL: `{sl}`\n"
-                f" TP: `{tp}`\n"
-                f"🛡️ Brackets: `{use_brackets}`\n"
-                f"📜 Details: `{str(result)}`"
-            )
-            send_discord_alert(discord_msg)
-            return jsonify({"status": "filled", "details": result}), 200
+            try:
+                # Execute order for this specific account
+                # Ensure 'accountID' here matches the argument name in topstep_client.execute_order
+                result = topstep_client.execute_order(
+                    accountID=accountID,
+                    action=action, 
+                    entry_price=entry,
+                    sl_price=sl,
+                    tp_price=tp,
+                    use_brackets=use_brackets,
+                    quantity=current_size
+                )
 
-        except Exception as e:
-            print(f" Order Failed: {e}")
-            # --- FAILURE ALERT ---
-            discord_msg = (
-                f"❌ **Order FAILED: {action}**\n"
-                f"⚠️ Error: `{str(e)}`"
-            )
-            send_discord_alert(discord_msg)
-            with open("error_log.txt", "a") as f:
-                f.write(f"[{datetime.now()}] FAILED: {action} - {e}\n")
-            return jsonify({"status": "failed", "error": str(e)}), 500
+                # Send success alert for this account
+                discord_msg = (
+                    f"🚀 **Order Filled**\n"
+                    f"🆔 Account: `{accountID}`\n"
+                    f"Action: `{action}` | Size: `{current_size}`\n"
+                    f"📜 Details: `{str(result)}`"
+                )
+                send_discord_alert(discord_msg)
+                
+                # Add success to results list
+                results.append({"account": accountID, "status": "filled", "details": result})
+
+            except Exception as e:
+                print(f" ❌ Order Failed for {accountID}: {e}")
+                
+                # Send failure alert for this account
+                discord_msg = (
+                    f"❌ **Order FAILED**\n"
+                    f"🆔 Account: `{accountID}`\n"
+                    f"⚠️ Error: `{str(e)}`"
+                )
+                send_discord_alert(discord_msg)
+                
+                # Log error to file
+                with open("error_log.txt", "a") as f:
+                    f.write(f"[{datetime.now()}] FAILED ACC {accountID}: {e}\n")
+                
+                # Add failure to results list
+                results.append({"account": accountID, "status": "failed", "error": str(e)})
+                
+                # Continue to the next account!
+                continue
+
+        # 4. Return Final Summary (After loop finishes)
+        return jsonify({"status": "processed", "results": results}), 200
 
     elif action == "EXIT":
         print(f" Processing Exit (Log Only)")
@@ -123,7 +177,7 @@ def webhook_listener():
     else:
         return jsonify({"status": "ignored"}), 200
 
-# --- NEW TEST ENDPOINT ---
+# --- TEST ENDPOINT ---
 @app.route('/test-refresh', methods=['GET'])
 def test_refresh():
     """Manually triggers the token refresh logic for testing purposes."""
