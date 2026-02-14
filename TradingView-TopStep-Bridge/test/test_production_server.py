@@ -6,6 +6,11 @@ from flask import Flask, request, jsonify
 from pyngrok import ngrok
 from dotenv import load_dotenv
 import requests
+import mock_topstep_client as topstep_client_mock
+
+####
+# to run: python production_server.py
+###
 # tmux new -s myserver (run the following commands inside a tmux session - allows server to run in terminal session once detached)
 # TO START SERVER: run  sudo python -m gunicorn --preload --workers 2 --threads 4 --worker-class gthread -b 0.0.0.0:8000 production_server:app
 # RUN keep_alive.py in the same tmux session different terminal to auto refresh token every 12 hours: python keep_alive.py
@@ -13,8 +18,7 @@ import requests
 # TO RE-ATTACH TMUX: tmux attach -t myserver
 # TO KILL PROCESSES: sudo pkill -9 -f production_server; sudo pkill -9 -f ngrok
 # TO AUTO MANUALLY AUTH TOKEN: http://localhost:8000/test-refresh OR if on Raspberry Pi http://damens-server.local:8000/test-refresh
-# Import the local client module
-import topstep_client
+
 
 # --- CONFIGURATION ---
 # Load environment variables from .env file
@@ -125,7 +129,7 @@ def webhook_listener():
             try:
                 # Execute order for this specific account
                 # Ensure 'accountID' here matches the argument name in topstep_client.execute_order
-                result = topstep_client.execute_order(
+                result = topstep_client_mock.execute_order(
                     accountID=accountID,
                     action=action, 
                     entry_price=entry,
@@ -134,7 +138,7 @@ def webhook_listener():
                     use_brackets=use_brackets,
                     quantity=current_size
                 )
-                
+
                 # Send success alert for this account
                 discord_msg = (
                     f"🚀 **Order sent to TopStep**\n"
@@ -142,6 +146,7 @@ def webhook_listener():
                     f"Action: `{action}` | Size: `{current_size}`\n"
                     f"📜 Details: `{str(result)}`"
                 )
+                print(action)
                 send_discord_alert(discord_msg)
                 
                 # Add success to results list
@@ -183,7 +188,7 @@ def test_refresh():
     """Manually triggers the token refresh logic for testing purposes."""
     print("\n🧪 Manual Test: Triggering Token Refresh...")
     try:
-        success = topstep_client.refresh_auth()
+        success = topstep_client_mock.refresh_auth()
         if success:
             load_dotenv("auth_tokens.env", override=True)
             new_token = os.getenv('RENEWED_AUTH')

@@ -1,0 +1,6 @@
+Alert: 2026-02-14 12:00:00 | BUY | Size: 10 | Entry: 19500.5 | Brackets: False
+Alert: 2026-02-14 12:05:00 | SELL | Size: 1 | Entry: 19500.0 | Brackets: False
+Alert: 2026-02-14 12:10:00 | BUY | Size: 2 | Entry: 19000.0 | Brackets: False
+Alert: 2026-02-14 12:20:00 | BUY | Size: 0 | Entry: 19100.0 | Brackets: False
+Alert: 2026-02-14 12:25:00 | BUY | Size: 1 | Entry: 19200.0 | Brackets: False
+Alert: 2026-02-14 12:15:00 | EXIT | Size: 2 | Entry: 0.0 | Brackets: False
