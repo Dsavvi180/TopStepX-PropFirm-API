@@ -31,7 +31,7 @@ def trigger_refresh():
         if response.status_code == 200:
             data = response.json()
             # Grab last 10 chars of token for verification
-            token_preview = data.get('new_token', 'Unknown')[-10:] if data.get('new_token') else "N/A"
+            token_preview = data.get('newToken', 'Unknown')[-10:] if data.get('newToken') else "N/A"
             
             msg = (
                 f"✅ **Token Refreshed Successfully**\n"
