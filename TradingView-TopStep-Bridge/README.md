@@ -6,3 +6,4 @@ When a TradingView strategy generates a signal, it sends a webhook alert to this
 
 The bridge broadcasts trade execution across multiple TopStep accounts simultaneously, and is designed to extend easily to other prop-firm APIs. Session management runs continuously in the background, with API keys revalidated at regular intervals to ensure uninterrupted access to the TopStep API.
 
+This bridging server runs on a home-made Raspberry Pi server.
